@@ -1,16 +1,13 @@
-
 --[[
     MIX0MUSI v2.2
     RED KING EDITION
     TELEPORT + R6 FLY
     Single LocalScript
 ]]
-
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-
 local Player = Players.LocalPlayer
 
 -- SETTINGS
@@ -18,7 +15,6 @@ local FlySpeed = 55
 local MinSpeed = 10
 local MaxSpeed = 500
 local SpeedStep = 5
-
 local Flying = false
 local FlyConnection
 local NoclipConnection
@@ -27,6 +23,10 @@ local BodyGyro
 local FlyHumanoid
 local OldAutoRotate
 local OriginalPhysics = {}
+
+-- TELEPORT STATE
+local CurrentTeleportTween = nil
+local CurrentTeleportConnection = nil
 
 -- TELEPORT LOCATIONS
 local Teleports = {
@@ -91,11 +91,9 @@ local function GetParent()
     local ok, result = pcall(function()
         return gethui()
     end)
-
     if ok and result then
         return result
     end
-
     return Player:WaitForChild("PlayerGui")
 end
 
@@ -153,7 +151,6 @@ local function MakeButton(parent, text, pos, size)
     button.Font = Enum.Font.GothamBold
     button.AutoButtonColor = false
     button.Parent = parent
-
     Round(button, 8)
     AddStroke(button, C.DarkRed)
 
@@ -176,6 +173,54 @@ local function MakeButton(parent, text, pos, size)
     return button
 end
 
+-- ==================================
+-- LOCAL NOCLIP (перенесено выше, чтобы телепорт мог использовать)
+-- ==================================
+local function ApplyNoClip(character)
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if not OriginalPhysics[part] then
+                OriginalPhysics[part] = {
+                    CanCollide = part.CanCollide,
+                    CanTouch = part.CanTouch
+                }
+            end
+            part.CanCollide = false
+            part.CanTouch = false
+        end
+    end
+end
+
+local function StopNoClip()
+    if NoclipConnection then
+        NoclipConnection:Disconnect()
+        NoclipConnection = nil
+    end
+
+    for part, properties in pairs(OriginalPhysics) do
+        if part and part.Parent then
+            pcall(function()
+                part.CanCollide = properties.CanCollide
+                part.CanTouch = properties.CanTouch
+            end)
+        end
+    end
+    table.clear(OriginalPhysics)
+end
+
+local function StartNoClip(character)
+    StopNoClip()
+    ApplyNoClip(character)
+
+    NoclipConnection = RunService.Stepped:Connect(function()
+        if not character or not character.Parent then
+            StopNoClip()
+            return
+        end
+        ApplyNoClip(character)
+    end)
+end
+
 -- MAIN WINDOW
 local Main = Instance.new("Frame")
 Main.Name = "Main"
@@ -185,7 +230,6 @@ Main.BackgroundColor3 = C.Black
 Main.BorderSizePixel = 0
 Main.ClipsDescendants = true
 Main.Parent = Gui
-
 Round(Main, 14)
 AddStroke(Main, C.Red, 1.5)
 
@@ -204,7 +248,6 @@ Bird.Position = UDim2.fromOffset(16, 11)
 Bird.BackgroundColor3 = C.Red
 Bird.BorderSizePixel = 0
 Bird.Parent = Header
-
 Round(Bird, 25)
 AddStroke(Bird, C.Gold)
 
@@ -322,7 +365,6 @@ Content.Parent = Body
 
 -- CREATE PAGES
 for i, name in ipairs(Names) do
-
     NavButtons[name] = MakeButton(
         Sidebar,
         name,
@@ -335,14 +377,12 @@ for i, name in ipairs(Names) do
     page.BackgroundTransparency = 1
     page.Visible = false
     page.Parent = Content
-
     Pages[name] = page
 end
 
 -- ==================================
 -- NOVEMBER PAGE
 -- ==================================
-
 local November = Pages.NOVEMBER
 
 MakeLabel(
@@ -368,7 +408,6 @@ FlyCard.Size = UDim2.new(1, -5, 0, 205)
 FlyCard.BackgroundColor3 = C.Panel
 FlyCard.BorderSizePixel = 0
 FlyCard.Parent = November
-
 Round(FlyCard, 12)
 AddStroke(FlyCard, C.DarkRed)
 
@@ -440,7 +479,6 @@ MakeLabel(
 -- ==================================
 -- TELEPORT PAGE
 -- ==================================
-
 local TeleportPage = Pages.TELEPORT
 
 MakeLabel(
@@ -470,7 +508,6 @@ TeleportList.ScrollBarImageColor3 = C.Red
 TeleportList.AutomaticCanvasSize = Enum.AutomaticSize.Y
 TeleportList.CanvasSize = UDim2.new(0, 0, 0, 0)
 TeleportList.Parent = TeleportPage
-
 Round(TeleportList, 10)
 AddStroke(TeleportList, C.DarkRed)
 
@@ -504,43 +541,88 @@ local function TeleportTo(point)
 
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     local root = character:FindFirstChild("HumanoidRootPart")
-
     if not humanoid or not root or humanoid.Health <= 0 then
         TeleportStatus.Text = "Character unavailable"
         return
     end
 
-    local destination = Vector3.new(
-        point.x,
-        point.y,
-        point.z
+    -- Если уже идёт телепорт — отменяем предыдущий
+    if CurrentTeleportTween then
+        CurrentTeleportTween:Cancel()
+        CurrentTeleportTween = nil
+    end
+    if CurrentTeleportConnection then
+        CurrentTeleportConnection:Disconnect()
+        CurrentTeleportConnection = nil
+    end
+
+    local destination = Vector3.new(point.x, point.y, point.z)
+    local targetCFrame = CFrame.new(destination)
+
+    -- Включаем noclip на всё время полёта
+    StartNoClip(character)
+
+    -- Чтобы физика и падение не мешали
+    local wasPlatformStand = humanoid.PlatformStand
+    humanoid.PlatformStand = true
+
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+
+    TeleportStatus.Text = "Teleporting to " .. point.name .. " (5s)..."
+
+    local tweenInfo = TweenInfo.new(
+        5, -- ровно 5 секунд
+        Enum.EasingStyle.Linear,
+        Enum.EasingDirection.Out
     )
 
-    local success, err = pcall(function()
-        character:PivotTo(CFrame.new(destination))
-        root.AssemblyLinearVelocity = Vector3.zero
-        root.AssemblyAngularVelocity = Vector3.zero
+    local tween = TweenService:Create(root, tweenInfo, {
+        CFrame = targetCFrame
+    })
+
+    CurrentTeleportTween = tween
+    tween:Play()
+
+    -- Каждые кадры держим скорость в нуле (чтобы не убило)
+    CurrentTeleportConnection = RunService.Heartbeat:Connect(function()
+        if root and root.Parent then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+        end
     end)
 
-    if success then
-        TeleportStatus.Text = "Requested: " .. point.name
-    else
-        TeleportStatus.Text = "Teleport error"
-        warn("[MIX0MUSI] Teleport error:", err)
-    end
+    tween.Completed:Once(function(playbackState)
+        if CurrentTeleportConnection then
+            CurrentTeleportConnection:Disconnect()
+            CurrentTeleportConnection = nil
+        end
+        CurrentTeleportTween = nil
+
+        if playbackState == Enum.PlaybackState.Completed and root and root.Parent and humanoid.Health > 0 then
+            root.CFrame = targetCFrame
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+            humanoid.PlatformStand = wasPlatformStand
+            StopNoClip()
+            TeleportStatus.Text = "Arrived: " .. point.name
+        else
+            StopNoClip()
+            if humanoid and humanoid.Parent then
+                humanoid.PlatformStand = wasPlatformStand
+            end
+        end
+    end)
 end
 
 for i, destination in ipairs(Teleports) do
-
     local point = destination
-
     local TeleportButton = MakeButton(
         TeleportList,
         point.name .. "     [ TELEPORT ]",
         UDim2.new(0, 0, 0, 0),
         UDim2.new(1, -6, 0, 43)
     )
-
     TeleportButton.LayoutOrder = i
 
     TeleportButton.MouseButton1Click:Connect(function()
@@ -551,9 +633,7 @@ end
 -- ==================================
 -- OTHER PAGES
 -- ==================================
-
 for _, name in ipairs({"FARM", "TROLL"}) do
-
     local page = Pages[name]
 
     MakeLabel(
@@ -570,7 +650,6 @@ for _, name in ipairs({"FARM", "TROLL"}) do
     coming.BackgroundColor3 = C.Panel
     coming.BorderSizePixel = 0
     coming.Parent = page
-
     Round(coming, 12)
     AddStroke(coming, C.DarkRed)
 
@@ -596,15 +675,12 @@ end
 -- ==================================
 -- NAVIGATION
 -- ==================================
-
 local function OpenPage(name)
-
     for pageName, page in pairs(Pages) do
         page.Visible = pageName == name
     end
 
     for buttonName, nav in pairs(NavButtons) do
-
         if buttonName == name then
             nav.BackgroundColor3 = C.Red
             nav.TextColor3 = C.White
@@ -624,70 +700,9 @@ end
 OpenPage("NOVEMBER")
 
 -- ==================================
--- LOCAL NOCLIP
--- ==================================
-
-local function ApplyNoClip(character)
-
-    for _, part in ipairs(character:GetDescendants()) do
-
-        if part:IsA("BasePart") then
-
-            if not OriginalPhysics[part] then
-                OriginalPhysics[part] = {
-                    CanCollide = part.CanCollide,
-                    CanTouch = part.CanTouch
-                }
-            end
-
-            part.CanCollide = false
-            part.CanTouch = false
-        end
-    end
-end
-
-local function StopNoClip()
-
-    if NoclipConnection then
-        NoclipConnection:Disconnect()
-        NoclipConnection = nil
-    end
-
-    for part, properties in pairs(OriginalPhysics) do
-
-        if part and part.Parent then
-            pcall(function()
-                part.CanCollide = properties.CanCollide
-                part.CanTouch = properties.CanTouch
-            end)
-        end
-    end
-
-    table.clear(OriginalPhysics)
-end
-
-local function StartNoClip(character)
-
-    StopNoClip()
-    ApplyNoClip(character)
-
-    NoclipConnection = RunService.Stepped:Connect(function()
-
-        if not character or not character.Parent then
-            StopNoClip()
-            return
-        end
-
-        ApplyNoClip(character)
-    end)
-end
-
--- ==================================
 -- FLY
 -- ==================================
-
 local function StopFly()
-
     Flying = false
 
     if FlyConnection then
@@ -722,27 +737,22 @@ local function StopFly()
 end
 
 local function StartFly()
-
     local character = Player.Character
     if not character then return false end
 
     local humanoid =
         character:FindFirstChildOfClass("Humanoid")
-
     local root =
         character:FindFirstChild("HumanoidRootPart")
 
     if not humanoid or not root then return false end
-
     if humanoid.RigType ~= Enum.HumanoidRigType.R6 then
         return false
     end
-
     if humanoid.Health <= 0 then return false end
 
     FlyHumanoid = humanoid
     OldAutoRotate = humanoid.AutoRotate
-
     humanoid.AutoRotate = false
 
     StartNoClip(character)
@@ -768,14 +778,11 @@ local function StartFly()
     BodyGyro.Parent = root
 
     Flying = true
-
     FlyButton.Text = "FLY: ON"
     FlyButton.BackgroundColor3 = C.Red
 
     FlyConnection = RunService.RenderStepped:Connect(function()
-
         if not Flying then return end
-
         if not root.Parent or humanoid.Health <= 0 then
             StopFly()
             return
@@ -796,23 +803,18 @@ local function StartFly()
         if UIS:IsKeyDown(Enum.KeyCode.W) then
             forward += 1
         end
-
         if UIS:IsKeyDown(Enum.KeyCode.S) then
             forward -= 1
         end
-
         if UIS:IsKeyDown(Enum.KeyCode.D) then
             side += 1
         end
-
         if UIS:IsKeyDown(Enum.KeyCode.A) then
             side -= 1
         end
-
         if UIS:IsKeyDown(Enum.KeyCode.Space) then
             vertical += 1
         end
-
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
             vertical -= 1
         end
@@ -834,15 +836,12 @@ local function StartFly()
 end
 
 FlyButton.MouseButton1Click:Connect(function()
-
     if Flying then
         StopFly()
     else
         local success = StartFly()
-
         if not success then
             FlyButton.Text = "R6 REQUIRED"
-
             task.delay(1.5, function()
                 if FlyButton.Parent and not Flying then
                     FlyButton.Text = "FLY: OFF"
@@ -855,7 +854,6 @@ end)
 -- ==================================
 -- SPEED
 -- ==================================
-
 local function UpdateSpeed()
     SpeedLabel.Text = tostring(FlySpeed) .. " / 500"
 end
@@ -873,14 +871,11 @@ end)
 -- ==================================
 -- MINIMIZE / CLOSE
 -- ==================================
-
 local Minimized = false
 
 Minimize.MouseButton1Click:Connect(function()
-
     Minimized = not Minimized
     Body.Visible = not Minimized
-
     Main.Size = Minimized
         and UDim2.fromOffset(650, 68)
         or UDim2.fromOffset(650, 450)
@@ -888,31 +883,51 @@ end)
 
 Close.MouseButton1Click:Connect(function()
     StopFly()
+    if CurrentTeleportTween then
+        CurrentTeleportTween:Cancel()
+    end
+    if CurrentTeleportConnection then
+        CurrentTeleportConnection:Disconnect()
+    end
+    StopNoClip()
     Gui:Destroy()
 end)
 
 -- RESPAWN
 Player.CharacterAdded:Connect(function()
     StopFly()
+    if CurrentTeleportTween then
+        CurrentTeleportTween:Cancel()
+        CurrentTeleportTween = nil
+    end
+    if CurrentTeleportConnection then
+        CurrentTeleportConnection:Disconnect()
+        CurrentTeleportConnection = nil
+    end
+    StopNoClip()
 end)
 
 Gui.Destroying:Connect(function()
     StopFly()
+    if CurrentTeleportTween then
+        CurrentTeleportTween:Cancel()
+    end
+    if CurrentTeleportConnection then
+        CurrentTeleportConnection:Disconnect()
+    end
+    StopNoClip()
 end)
 
 -- ==================================
 -- DRAG WINDOW
 -- ==================================
-
 local Dragging = false
 local DragStart
 local StartPosition
 
 Header.InputBegan:Connect(function(input)
-
     if input.UserInputType == Enum.UserInputType.MouseButton1
         or input.UserInputType == Enum.UserInputType.Touch then
-
         Dragging = true
         DragStart = input.Position
         StartPosition = Main.Position
@@ -926,14 +941,11 @@ Header.InputBegan:Connect(function(input)
 end)
 
 UIS.InputChanged:Connect(function(input)
-
     if Dragging and (
         input.UserInputType == Enum.UserInputType.MouseMovement
         or input.UserInputType == Enum.UserInputType.Touch
     ) then
-
         local delta = input.Position - DragStart
-
         Main.Position = UDim2.new(
             StartPosition.X.Scale,
             StartPosition.X.Offset + delta.X,
