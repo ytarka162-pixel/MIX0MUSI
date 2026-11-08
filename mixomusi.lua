@@ -1,13 +1,14 @@
 --[[
     Mix0musi
     Scorched Earth
-    UI Only + RightShift Toggle
+    Box ESP (Enemies Only)
 ]]
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
 
 local Player = Players.LocalPlayer
 
@@ -24,18 +25,17 @@ local Colors = {
     ToggleOff = Color3.fromRGB(45, 45, 55)
 }
 
--- Удаляем старое меню
+-- Удаляем старое
 pcall(function()
     local old = game:GetService("CoreGui"):FindFirstChild("Mix0musi")
     if old then old:Destroy() end
 end)
-
 pcall(function()
     local old = Player.PlayerGui:FindFirstChild("Mix0musi")
     if old then old:Destroy() end
 end)
 
--- Создаём ScreenGui
+-- ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Mix0musi"
 ScreenGui.ResetOnSpawn = false
@@ -119,7 +119,6 @@ local function CreateDrop(parent, x, y, height)
     drop.BorderSizePixel = 0
     drop.BackgroundTransparency = 0.15
     drop.Parent = parent
-
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = drop
@@ -131,7 +130,7 @@ CreateDrop(Sidebar, 46, 68, 17)
 CreateDrop(Sidebar, 60, 68, 11)
 CreateDrop(Sidebar, 74, 68, 15)
 
--- Кнопки навигации
+-- Навигация
 local NavButtons = {}
 local Pages = {}
 
@@ -224,9 +223,184 @@ AddPageTitle(Pages.NOVEMBER, "NOVEMBER")
 AddPageTitle(Pages.VISUALS, "VISUALS")
 AddPageTitle(Pages.COMBAT, "COMBAT")
 
+-- ===== TOGGLE SYSTEM =====
+local function CreateToggle(page, name, default, callback)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1, 0, 0, 48)
+    card.BackgroundColor3 = Colors.Card
+    card.BorderSizePixel = 0
+    card.Parent = page
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = card
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -70, 1, 0)
+    label.Position = UDim2.fromOffset(15, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Colors.Text
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = card
+
+    local toggleBg = Instance.new("Frame")
+    toggleBg.Size = UDim2.fromOffset(42, 22)
+    toggleBg.Position = UDim2.new(1, -55, 0.5, -11)
+    toggleBg.BackgroundColor3 = default and Colors.ToggleOn or Colors.ToggleOff
+    toggleBg.BorderSizePixel = 0
+    toggleBg.Parent = card
+
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggleBg
+
+    local circle = Instance.new("Frame")
+    circle.Size = UDim2.fromOffset(16, 16)
+    circle.Position = default and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    circle.BorderSizePixel = 0
+    circle.Parent = toggleBg
+
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(1, 0)
+    circleCorner.Parent = circle
+
+    local enabled = default
+
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.fromScale(1, 1)
+    button.BackgroundTransparency = 1
+    button.Text = ""
+    button.Parent = card
+
+    button.MouseButton1Click:Connect(function()
+        enabled = not enabled
+
+        TweenService:Create(toggleBg, TweenInfo.new(0.2), {
+            BackgroundColor3 = enabled and Colors.ToggleOn or Colors.ToggleOff
+        }):Play()
+
+        TweenService:Create(circle, TweenInfo.new(0.2), {
+            Position = enabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        }):Play()
+
+        if callback then
+            callback(enabled)
+        end
+    end)
+
+    return function()
+        return enabled
+    end
+end
+
+-- ===== BOX ESP =====
+local BoxESPEnabled = false
+local ESPObjects = {} -- [player] = {box, ...}
+
+local function ClearESP()
+    for _, obj in pairs(ESPObjects) do
+        if obj.Box then
+            obj.Box:Remove()
+        end
+    end
+    table.clear(ESPObjects)
+end
+
+local function IsEnemy(plr)
+    if plr == Player then return false end
+    if not plr.Team or not Player.Team then return true end -- если команды нет, считаем врагом
+    return plr.Team ~= Player.Team
+end
+
+local function CreateBox()
+    local box = Drawing.new("Square")
+    box.Visible = false
+    box.Color = Color3.fromRGB(255, 50, 50)
+    box.Thickness = 1.5
+    box.Filled = false
+    box.Transparency = 1
+    return box
+end
+
+local function UpdateESP()
+    if not BoxESPEnabled then
+        ClearESP()
+        return
+    end
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if IsEnemy(plr) and plr.Character then
+            local char = plr.Character
+            local root = char:FindFirstChild("HumanoidRootPart")
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+            if root and humanoid and humanoid.Health > 0 then
+                if not ESPObjects[plr] then
+                    ESPObjects[plr] = {
+                        Box = CreateBox()
+                    }
+                end
+
+                local box = ESPObjects[plr].Box
+
+                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+
+                if onScreen then
+                    local size = 4 / (pos.Z) * 100 -- примерный размер
+                    local height = size * 2.2
+                    local width = size * 1.1
+
+                    box.Size = Vector2.new(width, height)
+                    box.Position = Vector2.new(pos.X - width / 2, pos.Y - height / 2)
+                    box.Visible = true
+                else
+                    box.Visible = false
+                end
+            end
+        else
+            if ESPObjects[plr] then
+                if ESPObjects[plr].Box then
+                    ESPObjects[plr].Box:Remove()
+                end
+                ESPObjects[plr] = nil
+            end
+        end
+    end
+end
+
+-- Тоггл Box ESP
+CreateToggle(Pages.VISUALS, "Box ESP (Enemies)", false, function(state)
+    BoxESPEnabled = state
+    if not state then
+        ClearESP()
+    end
+end)
+
+-- Обновление ESP
+RunService.RenderStepped:Connect(function()
+    if BoxESPEnabled then
+        UpdateESP()
+    end
+end)
+
+-- Когда игрок выходит
+Players.PlayerRemoving:Connect(function(plr)
+    if ESPObjects[plr] then
+        if ESPObjects[plr].Box then
+            ESPObjects[plr].Box:Remove()
+        end
+        ESPObjects[plr] = nil
+    end
+end)
+
+-- Заглушки
 local function AddPlaceholder(page, text)
     local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 50)
+    card.Size = UDim2.new(1, 0, 0, 48)
     card.BackgroundColor3 = Colors.Card
     card.BorderSizePixel = 0
     card.Parent = page
@@ -248,7 +422,6 @@ local function AddPlaceholder(page, text)
 end
 
 AddPlaceholder(Pages.NOVEMBER, "Скоро здесь будут функции...")
-AddPlaceholder(Pages.VISUALS, "ESP, Boxes, Names и т.д.")
 AddPlaceholder(Pages.COMBAT, "Aimbot, Triggerbot, No Recoil...")
 
 -- Навигация
@@ -278,7 +451,7 @@ for name, btn in pairs(NavButtons) do
     end)
 end
 
-OpenPage("NOVEMBER")
+OpenPage("VISUALS")
 
 -- Перетаскивание
 local Dragging = false
@@ -336,16 +509,15 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui.Enabled = false
 end)
 
--- ===== RIGHT SHIFT TOGGLE =====
+-- RightShift
 local MenuVisible = true
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-
     if input.KeyCode == Enum.KeyCode.RightShift then
         MenuVisible = not MenuVisible
         ScreenGui.Enabled = MenuVisible
     end
 end)
 
-print("Mix0musi UI Loaded | RightShift to toggle")
+print("Mix0musi | Box ESP Loaded")
