@@ -1,7 +1,7 @@
 --[[
     Mix0musi
     Scorched Earth
-    Box ESP (Enemies Only)
+    Fixed Box ESP (Enemies Only)
 ]]
 
 local Players = game:GetService("Players")
@@ -18,7 +18,6 @@ local Colors = {
     Sidebar = Color3.fromRGB(18, 18, 24),
     Card = Color3.fromRGB(28, 28, 36),
     Accent = Color3.fromRGB(190, 40, 55),
-    AccentDark = Color3.fromRGB(120, 25, 35),
     Text = Color3.fromRGB(245, 245, 250),
     TextDim = Color3.fromRGB(160, 160, 175),
     ToggleOn = Color3.fromRGB(190, 40, 55),
@@ -35,21 +34,19 @@ pcall(function()
     if old then old:Destroy() end
 end)
 
--- ScreenGui
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Mix0musi"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Enabled = true
 
-local success = pcall(function()
+pcall(function()
     ScreenGui.Parent = game:GetService("CoreGui")
 end)
-if not success then
+if not ScreenGui.Parent then
     ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 end
 
--- Главное окно
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.Size = UDim2.fromOffset(620, 420)
@@ -59,26 +56,19 @@ Main.BorderSizePixel = 0
 Main.ClipsDescendants = true
 Main.Parent = ScreenGui
 
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 12)
-MainCorner.Parent = Main
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+local stroke = Instance.new("UIStroke", Main)
+stroke.Color = Colors.Accent
+stroke.Thickness = 1.2
+stroke.Transparency = 0.3
 
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Colors.Accent
-MainStroke.Thickness = 1.2
-MainStroke.Transparency = 0.3
-MainStroke.Parent = Main
-
--- ===== SIDEBAR =====
+-- Sidebar
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 160, 1, 0)
 Sidebar.BackgroundColor3 = Colors.Sidebar
 Sidebar.BorderSizePixel = 0
 Sidebar.Parent = Main
-
-local SidebarCorner = Instance.new("UICorner")
-SidebarCorner.CornerRadius = UDim.new(0, 12)
-SidebarCorner.Parent = Sidebar
+Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 12)
 
 local SidebarFix = Instance.new("Frame")
 SidebarFix.Size = UDim2.new(0, 20, 1, 0)
@@ -87,7 +77,6 @@ SidebarFix.BackgroundColor3 = Colors.Sidebar
 SidebarFix.BorderSizePixel = 0
 SidebarFix.Parent = Sidebar
 
--- Логотип
 local Logo = Instance.new("TextLabel")
 Logo.Size = UDim2.new(1, -20, 0, 50)
 Logo.Position = UDim2.fromOffset(10, 12)
@@ -110,30 +99,24 @@ SubLogo.Font = Enum.Font.Gotham
 SubLogo.TextXAlignment = Enum.TextXAlignment.Left
 SubLogo.Parent = Sidebar
 
--- Красные капли
-local function CreateDrop(parent, x, y, height)
-    local drop = Instance.new("Frame")
-    drop.Size = UDim2.fromOffset(5, height)
-    drop.Position = UDim2.fromOffset(x, y)
-    drop.BackgroundColor3 = Colors.Accent
-    drop.BorderSizePixel = 0
-    drop.BackgroundTransparency = 0.15
-    drop.Parent = parent
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(1, 0)
-    corner.Parent = drop
+local function CreateDrop(x, y, h)
+    local d = Instance.new("Frame")
+    d.Size = UDim2.fromOffset(5, h)
+    d.Position = UDim2.fromOffset(x, y)
+    d.BackgroundColor3 = Colors.Accent
+    d.BorderSizePixel = 0
+    d.BackgroundTransparency = 0.15
+    d.Parent = Sidebar
+    Instance.new("UICorner", d).CornerRadius = UDim.new(1, 0)
 end
+CreateDrop(18, 68, 14)
+CreateDrop(32, 68, 9)
+CreateDrop(46, 68, 17)
+CreateDrop(60, 68, 11)
+CreateDrop(74, 68, 15)
 
-CreateDrop(Sidebar, 18, 68, 14)
-CreateDrop(Sidebar, 32, 68, 9)
-CreateDrop(Sidebar, 46, 68, 17)
-CreateDrop(Sidebar, 60, 68, 11)
-CreateDrop(Sidebar, 74, 68, 15)
-
--- Навигация
 local NavButtons = {}
 local Pages = {}
-
 local Categories = {
     {Name = "NOVEMBER", Icon = "⚔"},
     {Name = "VISUALS", Icon = "👁"},
@@ -153,20 +136,14 @@ local function CreateNavButton(name, icon, order)
     btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.AutoButtonColor = false
     btn.Parent = Sidebar
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = btn
-
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     NavButtons[name] = btn
-    return btn
 end
 
 for i, cat in ipairs(Categories) do
     CreateNavButton(cat.Name, cat.Icon, i)
 end
 
--- ===== CONTENT =====
 local Content = Instance.new("Frame")
 Content.Size = UDim2.new(1, -170, 1, -20)
 Content.Position = UDim2.fromOffset(170, 10)
@@ -181,25 +158,22 @@ local function CreatePage(name)
     page.BorderSizePixel = 0
     page.ScrollBarThickness = 4
     page.ScrollBarImageColor3 = Colors.Accent
-    page.CanvasSize = UDim2.new(0, 0, 0, 0)
     page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
     page.Visible = false
     page.Parent = Content
 
     local layout = Instance.new("UIListLayout")
     layout.Padding = UDim.new(0, 10)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = page
 
-    local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0, 5)
-    padding.PaddingBottom = UDim.new(0, 15)
-    padding.PaddingLeft = UDim.new(0, 5)
-    padding.PaddingRight = UDim.new(0, 10)
-    padding.Parent = page
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 5)
+    pad.PaddingLeft = UDim.new(0, 5)
+    pad.PaddingRight = UDim.new(0, 10)
+    pad.Parent = page
 
     Pages[name] = page
-    return page
 end
 
 for _, cat in ipairs(Categories) do
@@ -215,7 +189,6 @@ local function AddPageTitle(page, text)
     title.TextSize = 20
     title.Font = Enum.Font.GothamBold
     title.TextXAlignment = Enum.TextXAlignment.Left
-    title.LayoutOrder = 0
     title.Parent = page
 end
 
@@ -223,17 +196,14 @@ AddPageTitle(Pages.NOVEMBER, "NOVEMBER")
 AddPageTitle(Pages.VISUALS, "VISUALS")
 AddPageTitle(Pages.COMBAT, "COMBAT")
 
--- ===== TOGGLE SYSTEM =====
+-- Toggle
 local function CreateToggle(page, name, default, callback)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, 0, 0, 48)
     card.BackgroundColor3 = Colors.Card
     card.BorderSizePixel = 0
     card.Parent = page
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = card
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -70, 1, 0)
@@ -252,10 +222,7 @@ local function CreateToggle(page, name, default, callback)
     toggleBg.BackgroundColor3 = default and Colors.ToggleOn or Colors.ToggleOff
     toggleBg.BorderSizePixel = 0
     toggleBg.Parent = card
-
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(1, 0)
-    toggleCorner.Parent = toggleBg
+    Instance.new("UICorner", toggleBg).CornerRadius = UDim.new(1, 0)
 
     local circle = Instance.new("Frame")
     circle.Size = UDim2.fromOffset(16, 16)
@@ -263,137 +230,117 @@ local function CreateToggle(page, name, default, callback)
     circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     circle.BorderSizePixel = 0
     circle.Parent = toggleBg
-
-    local circleCorner = Instance.new("UICorner")
-    circleCorner.CornerRadius = UDim.new(1, 0)
-    circleCorner.Parent = circle
+    Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
 
     local enabled = default
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.fromScale(1, 1)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = card
 
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.fromScale(1, 1)
-    button.BackgroundTransparency = 1
-    button.Text = ""
-    button.Parent = card
-
-    button.MouseButton1Click:Connect(function()
+    btn.MouseButton1Click:Connect(function()
         enabled = not enabled
-
         TweenService:Create(toggleBg, TweenInfo.new(0.2), {
             BackgroundColor3 = enabled and Colors.ToggleOn or Colors.ToggleOff
         }):Play()
-
         TweenService:Create(circle, TweenInfo.new(0.2), {
             Position = enabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
         }):Play()
-
-        if callback then
-            callback(enabled)
-        end
+        if callback then callback(enabled) end
     end)
-
-    return function()
-        return enabled
-    end
 end
 
--- ===== BOX ESP =====
+-- ===== BOX ESP (ИСПРАВЛЕННЫЙ) =====
 local BoxESPEnabled = false
-local ESPObjects = {} -- [player] = {box, ...}
-
-local function ClearESP()
-    for _, obj in pairs(ESPObjects) do
-        if obj.Box then
-            obj.Box:Remove()
-        end
-    end
-    table.clear(ESPObjects)
-end
+local Boxes = {}
 
 local function IsEnemy(plr)
     if plr == Player then return false end
-    if not plr.Team or not Player.Team then return true end -- если команды нет, считаем врагом
+    if not plr.Character then return false end
+    if not Player.Team or not plr.Team then return true end
     return plr.Team ~= Player.Team
 end
 
-local function CreateBox()
-    local box = Drawing.new("Square")
-    box.Visible = false
-    box.Color = Color3.fromRGB(255, 50, 50)
-    box.Thickness = 1.5
-    box.Filled = false
-    box.Transparency = 1
-    return box
-end
+local function GetBoxData(character)
+    local root = character:FindFirstChild("HumanoidRootPart")
+    local head = character:FindFirstChild("Head")
+    if not root then return nil end
 
-local function UpdateESP()
-    if not BoxESPEnabled then
-        ClearESP()
-        return
+    local topPos = head and head.Position or (root.Position + Vector3.new(0, 2.5, 0))
+    local bottomPos = root.Position - Vector3.new(0, 3, 0)
+
+    local top, topOnScreen = Camera:WorldToViewportPoint(topPos)
+    local bottom, bottomOnScreen = Camera:WorldToViewportPoint(bottomPos)
+
+    if not topOnScreen and not bottomOnScreen then
+        return nil
     end
 
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if IsEnemy(plr) and plr.Character then
-            local char = plr.Character
-            local root = char:FindFirstChild("HumanoidRootPart")
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local height = math.abs(top.Y - bottom.Y)
+    local width = height * 0.65
 
-            if root and humanoid and humanoid.Health > 0 then
-                if not ESPObjects[plr] then
-                    ESPObjects[plr] = {
-                        Box = CreateBox()
-                    }
-                end
-
-                local box = ESPObjects[plr].Box
-
-                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-
-                if onScreen then
-                    local size = 4 / (pos.Z) * 100 -- примерный размер
-                    local height = size * 2.2
-                    local width = size * 1.1
-
-                    box.Size = Vector2.new(width, height)
-                    box.Position = Vector2.new(pos.X - width / 2, pos.Y - height / 2)
-                    box.Visible = true
-                else
-                    box.Visible = false
-                end
-            end
-        else
-            if ESPObjects[plr] then
-                if ESPObjects[plr].Box then
-                    ESPObjects[plr].Box:Remove()
-                end
-                ESPObjects[plr] = nil
-            end
-        end
-    end
+    return {
+        Position = Vector2.new(top.X - width / 2, top.Y),
+        Size = Vector2.new(width, height)
+    }
 end
 
--- Тоггл Box ESP
+local function ClearAllBoxes()
+    for _, box in pairs(Boxes) do
+        pcall(function() box:Remove() end)
+    end
+    table.clear(Boxes)
+end
+
 CreateToggle(Pages.VISUALS, "Box ESP (Enemies)", false, function(state)
     BoxESPEnabled = state
     if not state then
-        ClearESP()
+        ClearAllBoxes()
     end
 end)
 
--- Обновление ESP
 RunService.RenderStepped:Connect(function()
-    if BoxESPEnabled then
-        UpdateESP()
+    if not BoxESPEnabled then return end
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if IsEnemy(plr) and plr.Character then
+            local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                local data = GetBoxData(plr.Character)
+
+                if data then
+                    if not Boxes[plr] then
+                        local box = Drawing.new("Square")
+                        box.Thickness = 1.5
+                        box.Filled = false
+                        box.Color = Color3.fromRGB(255, 40, 40)
+                        box.Transparency = 1
+                        Boxes[plr] = box
+                    end
+
+                    local box = Boxes[plr]
+                    box.Position = data.Position
+                    box.Size = data.Size
+                    box.Visible = true
+                else
+                    if Boxes[plr] then
+                        Boxes[plr].Visible = false
+                    end
+                end
+            end
+        else
+            if Boxes[plr] then
+                Boxes[plr].Visible = false
+            end
+        end
     end
 end)
 
--- Когда игрок выходит
 Players.PlayerRemoving:Connect(function(plr)
-    if ESPObjects[plr] then
-        if ESPObjects[plr].Box then
-            ESPObjects[plr].Box:Remove()
-        end
-        ESPObjects[plr] = nil
+    if Boxes[plr] then
+        pcall(function() Boxes[plr]:Remove() end)
+        Boxes[plr] = nil
     end
 end)
 
@@ -404,10 +351,7 @@ local function AddPlaceholder(page, text)
     card.BackgroundColor3 = Colors.Card
     card.BorderSizePixel = 0
     card.Parent = page
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = card
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -20, 1, 0)
@@ -426,21 +370,14 @@ AddPlaceholder(Pages.COMBAT, "Aimbot, Triggerbot, No Recoil...")
 
 -- Навигация
 local function OpenPage(name)
-    for pageName, page in pairs(Pages) do
-        page.Visible = (pageName == name)
+    for n, p in pairs(Pages) do
+        p.Visible = (n == name)
     end
-
-    for btnName, btn in pairs(NavButtons) do
-        if btnName == name then
-            TweenService:Create(btn, TweenInfo.new(0.2), {
-                BackgroundColor3 = Colors.Accent,
-                TextColor3 = Colors.Text
-            }):Play()
+    for n, btn in pairs(NavButtons) do
+        if n == name then
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.Accent, TextColor3 = Colors.Text}):Play()
         else
-            TweenService:Create(btn, TweenInfo.new(0.2), {
-                BackgroundColor3 = Colors.Card,
-                TextColor3 = Colors.TextDim
-            }):Play()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Colors.Card, TextColor3 = Colors.TextDim}):Play()
         end
     end
 end
@@ -453,71 +390,55 @@ end
 
 OpenPage("VISUALS")
 
--- Перетаскивание
-local Dragging = false
-local DragStart
-local StartPos
+-- Drag
+local dragging, dragStart, startPos
+local dragZone = Instance.new("Frame")
+dragZone.Size = UDim2.new(1, 0, 0, 60)
+dragZone.BackgroundTransparency = 1
+dragZone.Parent = Main
 
-local DragZone = Instance.new("Frame")
-DragZone.Size = UDim2.new(1, 0, 0, 60)
-DragZone.BackgroundTransparency = 1
-DragZone.Parent = Main
-
-DragZone.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        Dragging = true
-        DragStart = input.Position
-        StartPos = Main.Position
+dragZone.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Main.Position
     end
 end)
 
-DragZone.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        Dragging = false
+dragZone.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
     end
 end)
 
 UserInputService.InputChanged:Connect(function(input)
-    if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - DragStart
-        Main.Position = UDim2.new(
-            StartPos.X.Scale,
-            StartPos.X.Offset + delta.X,
-            StartPos.Y.Scale,
-            StartPos.Y.Offset + delta.Y
-        )
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- Кнопка закрытия
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.fromOffset(32, 32)
-CloseBtn.Position = UDim2.new(1, -42, 0, 12)
-CloseBtn.BackgroundColor3 = Colors.Card
-CloseBtn.BorderSizePixel = 0
-CloseBtn.Text = "×"
-CloseBtn.TextColor3 = Colors.Text
-CloseBtn.TextSize = 20
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Parent = Main
-
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 8)
-CloseCorner.Parent = CloseBtn
-
-CloseBtn.MouseButton1Click:Connect(function()
+-- Close
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromOffset(32, 32)
+close.Position = UDim2.new(1, -42, 0, 12)
+close.BackgroundColor3 = Colors.Card
+close.Text = "×"
+close.TextColor3 = Colors.Text
+close.TextSize = 20
+close.Font = Enum.Font.GothamBold
+close.Parent = Main
+Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
+close.MouseButton1Click:Connect(function()
     ScreenGui.Enabled = false
 end)
 
 -- RightShift
-local MenuVisible = true
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        MenuVisible = not MenuVisible
-        ScreenGui.Enabled = MenuVisible
+        ScreenGui.Enabled = not ScreenGui.Enabled
     end
 end)
 
-print("Mix0musi | Box ESP Loaded")
+print("Mix0musi | Fixed Box ESP")
