@@ -1,7 +1,7 @@
 --[[
     Mix0musi
     Scorched Earth
-    UI Only
+    UI Only + RightShift Toggle
 ]]
 
 local Players = game:GetService("Players")
@@ -40,6 +40,7 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "Mix0musi"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Enabled = true
 
 local success = pcall(function()
     ScreenGui.Parent = game:GetService("CoreGui")
@@ -79,7 +80,6 @@ local SidebarCorner = Instance.new("UICorner")
 SidebarCorner.CornerRadius = UDim.new(0, 12)
 SidebarCorner.Parent = Sidebar
 
--- Убираем скругление справа у сайдбара
 local SidebarFix = Instance.new("Frame")
 SidebarFix.Size = UDim2.new(0, 20, 1, 0)
 SidebarFix.Position = UDim2.new(1, -20, 0, 0)
@@ -87,7 +87,7 @@ SidebarFix.BackgroundColor3 = Colors.Sidebar
 SidebarFix.BorderSizePixel = 0
 SidebarFix.Parent = Sidebar
 
--- Логотип / Название
+-- Логотип
 local Logo = Instance.new("TextLabel")
 Logo.Size = UDim2.new(1, -20, 0, 50)
 Logo.Position = UDim2.fromOffset(10, 12)
@@ -110,7 +110,7 @@ SubLogo.Font = Enum.Font.Gotham
 SubLogo.TextXAlignment = Enum.TextXAlignment.Left
 SubLogo.Parent = Sidebar
 
--- Красные капли (декор)
+-- Красные капли
 local function CreateDrop(parent, x, y, height)
     local drop = Instance.new("Frame")
     drop.Size = UDim2.fromOffset(5, height)
@@ -123,8 +123,6 @@ local function CreateDrop(parent, x, y, height)
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = drop
-
-    return drop
 end
 
 CreateDrop(Sidebar, 18, 68, 14)
@@ -169,14 +167,13 @@ for i, cat in ipairs(Categories) do
     CreateNavButton(cat.Name, cat.Icon, i)
 end
 
--- ===== CONTENT AREA =====
+-- ===== CONTENT =====
 local Content = Instance.new("Frame")
 Content.Size = UDim2.new(1, -170, 1, -20)
 Content.Position = UDim2.fromOffset(170, 10)
 Content.BackgroundTransparency = 1
 Content.Parent = Main
 
--- Создаём страницы
 local function CreatePage(name)
     local page = Instance.new("ScrollingFrame")
     page.Name = name
@@ -210,7 +207,6 @@ for _, cat in ipairs(Categories) do
     CreatePage(cat.Name)
 end
 
--- Заголовок страницы
 local function AddPageTitle(page, text)
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 30)
@@ -228,7 +224,6 @@ AddPageTitle(Pages.NOVEMBER, "NOVEMBER")
 AddPageTitle(Pages.VISUALS, "VISUALS")
 AddPageTitle(Pages.COMBAT, "COMBAT")
 
--- Заглушки (потом заменим на реальные функции)
 local function AddPlaceholder(page, text)
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1, 0, 0, 50)
@@ -256,7 +251,7 @@ AddPlaceholder(Pages.NOVEMBER, "Скоро здесь будут функции.
 AddPlaceholder(Pages.VISUALS, "ESP, Boxes, Names и т.д.")
 AddPlaceholder(Pages.COMBAT, "Aimbot, Triggerbot, No Recoil...")
 
--- ===== НАВИГАЦИЯ =====
+-- Навигация
 local function OpenPage(name)
     for pageName, page in pairs(Pages) do
         page.Visible = (pageName == name)
@@ -285,7 +280,7 @@ end
 
 OpenPage("NOVEMBER")
 
--- ===== ПЕРЕТАСКИВАНИЕ =====
+-- Перетаскивание
 local Dragging = false
 local DragStart
 local StartPos
@@ -338,7 +333,19 @@ CloseCorner.CornerRadius = UDim.new(0, 8)
 CloseCorner.Parent = CloseBtn
 
 CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
+    ScreenGui.Enabled = false
 end)
 
-print("Mix0musi UI Loaded")
+-- ===== RIGHT SHIFT TOGGLE =====
+local MenuVisible = true
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        MenuVisible = not MenuVisible
+        ScreenGui.Enabled = MenuVisible
+    end
+end)
+
+print("Mix0musi UI Loaded | RightShift to toggle")
