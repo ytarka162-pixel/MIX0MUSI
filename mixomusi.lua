@@ -1,691 +1,749 @@
 
 --[[
-    MIX0MUSI v1.2
-    GUI + R6 FLY + SPEED CONTROLLER
-    Local movement / noclip prototype
+    MIX0MUSI V2.0
+    RED KING EDITION
+    Roblox Studio LocalScript
+    R6 Fly
+    Speed: 10 - 500
 ]]
 
--- SERVICES
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local player = Players.LocalPlayer
-
--- GUI PARENT
-local function getGuiParent()
-    local ok, result = pcall(function()
-        return gethui()
-    end)
-
-    if ok and result then
-        return result
-    end
-
-    return game:GetService("CoreGui")
-end
-
-local guiParent = getGuiParent()
-
--- REMOVE OLD GUI
-pcall(function()
-    local old = guiParent:FindFirstChild("MIX0MUSI_GUI")
-    if old then
-        old:Destroy()
-    end
-end)
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
 
 -- COLORS
-local BLACK = Color3.fromRGB(13, 13, 16)
-local PANEL = Color3.fromRGB(22, 22, 27)
-local BUTTON = Color3.fromRGB(32, 32, 39)
-local WHITE = Color3.fromRGB(240, 240, 245)
-local GRAY = Color3.fromRGB(155, 155, 165)
+local C = {
+    Background = Color3.fromRGB(12, 9, 13),
+    Panel = Color3.fromRGB(25, 15, 21),
+    Card = Color3.fromRGB(36, 20, 27),
+    Red = Color3.fromRGB(190, 42, 57),
+    RedDark = Color3.fromRGB(105, 25, 37),
+    White = Color3.fromRGB(245, 237, 239),
+    Gray = Color3.fromRGB(165, 145, 152),
+    Gold = Color3.fromRGB(235, 184, 72),
+    Green = Color3.fromRGB(65, 190, 115)
+}
 
--- SCREEN GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MIX0MUSI_GUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+-- SETTINGS
+local FlySpeed = 55
+local MinSpeed = 10
+local MaxSpeed = 500
+local SpeedStep = 5
+
+local FlyEnabled = false
+local FlyConnection = nil
+local FlyAttachment = nil
+local FlyVelocity = nil
+local FlyOrientation = nil
+local FlyHumanoid = nil
+local OldAutoRotate = nil
+
+-- CLEAN OLD GUI
+local Old = PlayerGui:FindFirstChild("MIX0MUSI_V2")
+if Old then
+    Old:Destroy()
+end
+
+-- GUI
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "MIX0MUSI_V2"
+Gui.ResetOnSpawn = false
+Gui.IgnoreGuiInset = true
+Gui.DisplayOrder = 20
+Gui.Parent = PlayerGui
+
+local function Round(Object, Radius)
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, Radius)
+    Corner.Parent = Object
+    return Corner
+end
+
+local function Stroke(Object, Color, Thickness)
+    local S = Instance.new("UIStroke")
+    S.Color = Color
+    S.Thickness = Thickness or 1
+    S.Parent = Object
+    return S
+end
+
+local function Label(Parent, Text, Position, Size, TextSize, Color)
+    local L = Instance.new("TextLabel")
+    L.BackgroundTransparency = 1
+    L.Position = Position
+    L.Size = Size
+    L.Text = Text
+    L.TextColor3 = Color or C.White
+    L.TextSize = TextSize or 14
+    L.Font = Enum.Font.GothamBold
+    L.Parent = Parent
+    return L
+end
+
+local function Button(Parent, Text, Position, Size)
+    local B = Instance.new("TextButton")
+    B.Position = Position
+    B.Size = Size
+    B.BackgroundColor3 = C.Card
+    B.BorderSizePixel = 0
+    B.Text = Text
+    B.TextColor3 = C.White
+    B.TextSize = 14
+    B.Font = Enum.Font.GothamBold
+    B.AutoButtonColor = false
+    B.Parent = Parent
+
+    Round(B, 9)
+    Stroke(B, C.RedDark, 1)
+
+    B.MouseEnter:Connect(function()
+        TweenService:Create(
+            B,
+            TweenInfo.new(0.15),
+            {BackgroundColor3 = C.RedDark}
+        ):Play()
+    end)
+
+    B.MouseLeave:Connect(function()
+        TweenService:Create(
+            B,
+            TweenInfo.new(0.15),
+            {BackgroundColor3 = C.Card}
+        ):Play()
+    end)
+
+    return B
+end
 
 -- MAIN WINDOW
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = UDim2.new(0, 430, 0, 300)
-Main.Position = UDim2.new(0.5, -215, 0.5, -150)
-Main.BackgroundColor3 = BLACK
+Main.Size = UDim2.fromOffset(650, 410)
+Main.Position = UDim2.new(0.5, -325, 0.5, -205)
+Main.BackgroundColor3 = C.Background
 Main.BorderSizePixel = 0
 Main.ClipsDescendants = true
-Main.Parent = ScreenGui
+Main.Parent = Gui
 
-Instance.new("UICorner", Main).CornerRadius =
-    UDim.new(0, 10)
-
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(65, 65, 75)
-MainStroke.Thickness = 1
-MainStroke.Parent = Main
+Round(Main, 14)
+Stroke(Main, C.Red, 1.5)
 
 -- HEADER
 local Header = Instance.new("Frame")
-Header.Size = UDim2.new(1, 0, 0, 44)
-Header.BackgroundColor3 = PANEL
+Header.Size = UDim2.new(1, 0, 0, 68)
+Header.BackgroundColor3 = C.Panel
 Header.BorderSizePixel = 0
+Header.Active = true
 Header.Parent = Main
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -100, 1, 0)
-Title.Position = UDim2.new(0, 10, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "MIX0MUSI"
-Title.TextColor3 = WHITE
-Title.TextSize = 20
-Title.Font = Enum.Font.GothamBold
-Title.Parent = Header
+-- ORIGINAL RED BIRD MASCOT
+local Bird = Instance.new("Frame")
+Bird.Size = UDim2.fromOffset(45, 45)
+Bird.Position = UDim2.fromOffset(17, 11)
+Bird.BackgroundColor3 = C.Red
+Bird.BorderSizePixel = 0
+Bird.Parent = Header
+
+Round(Bird, 25)
+Stroke(Bird, C.Gold, 1)
+
+for i = 1, 2 do
+    local Eye = Instance.new("Frame")
+    Eye.Size = UDim2.fromOffset(11, 13)
+    Eye.Position = UDim2.fromOffset(10 + (i - 1) * 14, 11)
+    Eye.BackgroundColor3 = C.White
+    Eye.BorderSizePixel = 0
+    Eye.Parent = Bird
+    Round(Eye, 7)
+
+    local Pupil = Instance.new("Frame")
+    Pupil.Size = UDim2.fromOffset(4, 6)
+    Pupil.Position = UDim2.fromOffset(4, 4)
+    Pupil.BackgroundColor3 = C.Background
+    Pupil.BorderSizePixel = 0
+    Pupil.Parent = Eye
+    Round(Pupil, 3)
+end
+
+Label(
+    Bird,
+    "▼",
+    UDim2.fromOffset(13, 23),
+    UDim2.fromOffset(22, 18),
+    14,
+    C.Gold
+)
+
+-- TITLE
+Label(
+    Header,
+    "MIX0MUSI",
+    UDim2.fromOffset(75, 10),
+    UDim2.fromOffset(245, 31),
+    24,
+    C.White
+)
+
+Label(
+    Header,
+    "RED KING EDITION",
+    UDim2.fromOffset(77, 40),
+    UDim2.fromOffset(200, 16),
+    10,
+    C.Red
+)
+
+Label(
+    Header,
+    "♛",
+    UDim2.new(1, -115, 0, 8),
+    UDim2.fromOffset(35, 35),
+    26,
+    C.Gold
+)
+
+-- DECORATIVE DROPS
+for i = 1, 5 do
+    local Drop = Instance.new("Frame")
+    Drop.Size = UDim2.fromOffset(5 + (i % 2) * 3, 13 + (i % 3) * 3)
+    Drop.Position = UDim2.new(1, -145 + i * 17, 0, 3)
+    Drop.BackgroundColor3 = C.Red
+    Drop.BorderSizePixel = 0
+    Drop.Parent = Header
+    Round(Drop, 6)
+end
 
 -- CLOSE
-local Close = Instance.new("TextButton")
-Close.Size = UDim2.new(0, 34, 0, 30)
-Close.Position = UDim2.new(1, -39, 0, 7)
-Close.BackgroundColor3 = Color3.fromRGB(125, 40, 45)
-Close.Text = "X"
-Close.TextColor3 = WHITE
-Close.TextSize = 15
-Close.Font = Enum.Font.GothamBold
-Close.BorderSizePixel = 0
-Close.Parent = Header
-
-Instance.new("UICorner", Close).CornerRadius =
-    UDim.new(0, 6)
+local Close = Button(
+    Header,
+    "X",
+    UDim2.new(1, -43, 0, 17),
+    UDim2.fromOffset(30, 30)
+)
 
 -- MINIMIZE
-local Minimize = Instance.new("TextButton")
-Minimize.Size = UDim2.new(0, 34, 0, 30)
-Minimize.Position = UDim2.new(1, -77, 0, 7)
-Minimize.BackgroundColor3 = BUTTON
-Minimize.Text = "—"
-Minimize.TextColor3 = WHITE
-Minimize.TextSize = 15
-Minimize.Font = Enum.Font.GothamBold
-Minimize.BorderSizePixel = 0
-Minimize.Parent = Header
-
-Instance.new("UICorner", Minimize).CornerRadius =
-    UDim.new(0, 6)
+local Minimize = Button(
+    Header,
+    "—",
+    UDim2.new(1, -81, 0, 17),
+    UDim2.fromOffset(30, 30)
+)
 
 -- BODY
 local Body = Instance.new("Frame")
-Body.Size = UDim2.new(1, 0, 1, -44)
-Body.Position = UDim2.new(0, 0, 0, 44)
-Body.BackgroundColor3 = BLACK
-Body.BorderSizePixel = 0
+Body.Position = UDim2.fromOffset(0, 68)
+Body.Size = UDim2.new(1, 0, 1, -68)
+Body.BackgroundTransparency = 1
 Body.Parent = Main
 
--- HOME
-local Home = Instance.new("Frame")
-Home.Size = UDim2.new(1, 0, 1, 0)
-Home.BackgroundTransparency = 1
-Home.Parent = Body
+-- SIDEBAR
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 150, 1, 0)
+Sidebar.BackgroundColor3 = C.Panel
+Sidebar.BorderSizePixel = 0
+Sidebar.Parent = Body
 
--- SECTION
-local Section = Instance.new("Frame")
-Section.Size = UDim2.new(1, 0, 1, 0)
-Section.BackgroundTransparency = 1
-Section.Visible = false
-Section.Parent = Body
+local SideTitle = Label(
+    Sidebar,
+    "MENU",
+    UDim2.fromOffset(18, 16),
+    UDim2.fromOffset(110, 22),
+    11,
+    C.Gray
+)
 
--- BUTTON CREATOR
-local function CreateButton(parent, text, position, size)
-    local button = Instance.new("TextButton")
-
-    button.Size = size
-    button.Position = position
-    button.BackgroundColor3 = BUTTON
-    button.BorderSizePixel = 0
-    button.Text = text
-    button.TextColor3 = WHITE
-    button.TextSize = 16
-    button.Font = Enum.Font.GothamBold
-    button.AutoButtonColor = false
-    button.Parent = parent
-
-    Instance.new("UICorner", button).CornerRadius =
-        UDim.new(0, 7)
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(65, 65, 75)
-    stroke.Thickness = 1
-    stroke.Parent = button
-
-    button.MouseEnter:Connect(function()
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.15),
-            {
-                BackgroundColor3 =
-                    Color3.fromRGB(50, 50, 60)
-            }
-        ):Play()
-    end)
-
-    button.MouseLeave:Connect(function()
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.15),
-            {
-                BackgroundColor3 = BUTTON
-            }
-        ):Play()
-    end)
-
-    return button
-end
-
--- HOME BUTTONS
-local NovemberButton = CreateButton(
-    Home,
+local NavNames = {
     "NOVEMBER",
-    UDim2.new(0, 24, 0, 25),
-    UDim2.new(0, 250, 0, 48)
-)
-
-local FarmButton = CreateButton(
-    Home,
     "FARM",
-    UDim2.new(0, 24, 0, 85),
-    UDim2.new(0, 250, 0, 48)
-)
+    "TROLL",
+    "TELEPORT"
+}
 
--- SECTION TITLE
-local SectionTitle = Instance.new("TextLabel")
-SectionTitle.Size = UDim2.new(1, -40, 0, 40)
-SectionTitle.Position = UDim2.new(0, 20, 0, 15)
-SectionTitle.BackgroundTransparency = 1
-SectionTitle.Text = ""
-SectionTitle.TextColor3 = WHITE
-SectionTitle.TextSize = 21
-SectionTitle.Font = Enum.Font.GothamBold
-SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
-SectionTitle.Parent = Section
+local NavButtons = {}
+local Pages = {}
 
--- INFO
-local Info = Instance.new("TextLabel")
-Info.Size = UDim2.new(1, -40, 0, 35)
-Info.Position = UDim2.new(0, 20, 0, 65)
-Info.BackgroundTransparency = 1
-Info.Text = ""
-Info.TextColor3 = GRAY
-Info.TextSize = 13
-Info.Font = Enum.Font.Gotham
-Info.TextXAlignment = Enum.TextXAlignment.Left
-Info.Parent = Section
+-- CONTENT AREA
+local Content = Instance.new("Frame")
+Content.Position = UDim2.fromOffset(165, 12)
+Content.Size = UDim2.new(1, -180, 1, -24)
+Content.BackgroundTransparency = 1
+Content.Parent = Body
 
--- BACK
-local Back = CreateButton(
-    Section,
-    "← BACK",
-    UDim2.new(0, 20, 1, -58),
-    UDim2.new(0, 110, 0, 38)
-)
+-- CREATE PAGES
+for i, Name in ipairs(NavNames) do
+    local Nav = Button(
+        Sidebar,
+        Name,
+        UDim2.fromOffset(10, 48 + (i - 1) * 52),
+        UDim2.fromOffset(130, 42)
+    )
 
--- ==================================
--- NOVEMBER CONTROLS
--- ==================================
+    NavButtons[Name] = Nav
 
-local FlyButton = CreateButton(
-    Section,
-    "FLY: OFF",
-    UDim2.new(0, 20, 0, 110),
-    UDim2.new(0, 250, 0, 42)
-)
+    local Page = Instance.new("Frame")
+    Page.Size = UDim2.fromScale(1, 1)
+    Page.BackgroundTransparency = 1
+    Page.Visible = false
+    Page.Parent = Content
 
--- SPEED SETTINGS
-local flySpeed = 55
+    Pages[Name] = Page
 
-local SpeedDown = CreateButton(
-    Section,
-    "-",
-    UDim2.new(0, 20, 0, 160),
-    UDim2.new(0, 42, 0, 32)
-)
+    if Name == "NOVEMBER" then
+        Label(
+            Page,
+            "NOVEMBER",
+            UDim2.fromOffset(5, 3),
+            UDim2.fromOffset(300, 35),
+            22,
+            C.White
+        )
 
-local SpeedLabel = Instance.new("TextLabel")
-SpeedLabel.Size = UDim2.new(0, 160, 0, 32)
-SpeedLabel.Position = UDim2.new(0, 70, 0, 160)
-SpeedLabel.BackgroundColor3 = PANEL
-SpeedLabel.TextColor3 = WHITE
-SpeedLabel.Text = "SPEED: 55"
-SpeedLabel.TextSize = 14
-SpeedLabel.Font = Enum.Font.GothamBold
-SpeedLabel.BorderSizePixel = 0
-SpeedLabel.Parent = Section
+        Label(
+            Page,
+            "FLIGHT CONTROL",
+            UDim2.fromOffset(7, 36),
+            UDim2.fromOffset(250, 20),
+            11,
+            C.Gray
+        )
 
-Instance.new("UICorner", SpeedLabel).CornerRadius =
-    UDim.new(0, 7)
+        local FlyCard = Instance.new("Frame")
+        FlyCard.Position = UDim2.fromOffset(0, 68)
+        FlyCard.Size = UDim2.new(1, -5, 0, 205)
+        FlyCard.BackgroundColor3 = C.Panel
+        FlyCard.BorderSizePixel = 0
+        FlyCard.Parent = Page
 
-local SpeedUp = CreateButton(
-    Section,
-    "+",
-    UDim2.new(0, 238, 0, 160),
-    UDim2.new(0, 42, 0, 32)
-)
+        Round(FlyCard, 12)
+        Stroke(FlyCard, C.RedDark, 1)
 
--- ==================================
--- FLY + LOCAL NOCLIP
--- ==================================
+        Label(
+            FlyCard,
+            "R6 FLY",
+            UDim2.fromOffset(18, 14),
+            UDim2.fromOffset(180, 26),
+            17,
+            C.White
+        )
 
-local flyEnabled = false
-local flyConnection = nil
-local noclipConnection = nil
+        Label(
+            FlyCard,
+            "MOVEMENT SYSTEM",
+            UDim2.fromOffset(19, 39),
+            UDim2.fromOffset(180, 18),
+            10,
+            C.Gray
+        )
 
-local flyVelocity = nil
-local flyGyro = nil
-local flyHumanoid = nil
+        local FlyButton = Button(
+            FlyCard,
+            "FLY: OFF",
+            UDim2.fromOffset(18, 70),
+            UDim2.fromOffset(190, 43)
+        )
 
-local oldAutoRotate = nil
-local originalPhysics = {}
+        -- SPEED
+        Label(
+            FlyCard,
+            "FLIGHT SPEED",
+            UDim2.fromOffset(18, 128),
+            UDim2.fromOffset(150, 20),
+            11,
+            C.Gray
+        )
 
--- NOCLIP
-local function ApplyNoClip(character)
+        local Minus = Button(
+            FlyCard,
+            "−",
+            UDim2.fromOffset(18, 155),
+            UDim2.fromOffset(43, 34)
+        )
 
-    for _, part in ipairs(character:GetDescendants()) do
+        local SpeedValue = Label(
+            FlyCard,
+            tostring(FlySpeed),
+            UDim2.fromOffset(70, 154),
+            UDim2.fromOffset(105, 35),
+            23,
+            C.Gold
+        )
 
-        if part:IsA("BasePart") then
+        local Plus = Button(
+            FlyCard,
+            "+",
+            UDim2.fromOffset(185, 155),
+            UDim2.fromOffset(43, 34)
+        )
 
-            if not originalPhysics[part] then
-                originalPhysics[part] = {
-                    CanCollide = part.CanCollide,
-                    CanTouch = part.CanTouch,
-                    CanQuery = part.CanQuery
-                }
+        local MaxLabel = Label(
+            FlyCard,
+            "MIN 10                         MAX 500",
+            UDim2.fromOffset(18, 191),
+            UDim2.fromOffset(240, 14),
+            9,
+            C.Gray
+        )
+
+        -- CONTROLS
+        Label(
+            Page,
+            "W A S D  - MOVE     SPACE - UP     CTRL - DOWN",
+            UDim2.fromOffset(4, 284),
+            UDim2.new(1, -10, 0, 20),
+            10,
+            C.Gray
+        )
+
+        -- SPEED EVENTS
+        local function UpdateSpeed()
+            SpeedValue.Text = tostring(FlySpeed)
+        end
+
+        Minus.MouseButton1Click:Connect(function()
+            FlySpeed = math.max(
+                MinSpeed,
+                FlySpeed - SpeedStep
+            )
+            UpdateSpeed()
+        end)
+
+        Plus.MouseButton1Click:Connect(function()
+            FlySpeed = math.min(
+                MaxSpeed,
+                FlySpeed + SpeedStep
+            )
+            UpdateSpeed()
+        end)
+
+        -- FLY FUNCTIONS
+        local function UpdateFlyButton()
+            if FlyEnabled then
+                FlyButton.Text = "FLY: ON"
+                FlyButton.BackgroundColor3 = C.Red
+            else
+                FlyButton.Text = "FLY: OFF"
+                FlyButton.BackgroundColor3 = C.Card
+            end
+        end
+
+        local function StopFly()
+            FlyEnabled = false
+
+            if FlyConnection then
+                FlyConnection:Disconnect()
+                FlyConnection = nil
             end
 
-            part.CanCollide = false
-            part.CanTouch = false
-            part.CanQuery = false
-        end
-    end
-end
+            if FlyVelocity then
+                FlyVelocity:Destroy()
+                FlyVelocity = nil
+            end
 
--- RESTORE LOCAL PHYSICS
-local function StopNoClip()
+            if FlyOrientation then
+                FlyOrientation:Destroy()
+                FlyOrientation = nil
+            end
 
-    if noclipConnection then
-        noclipConnection:Disconnect()
-        noclipConnection = nil
-    end
+            if FlyAttachment then
+                FlyAttachment:Destroy()
+                FlyAttachment = nil
+            end
 
-    for part, properties in pairs(originalPhysics) do
+            if FlyHumanoid and FlyHumanoid.Parent then
+                FlyHumanoid.AutoRotate = OldAutoRotate
+                FlyHumanoid:ChangeState(
+                    Enum.HumanoidStateType.GettingUp
+                )
+            end
 
-        if part and part.Parent then
-            pcall(function()
-                part.CanCollide = properties.CanCollide
-                part.CanTouch = properties.CanTouch
-                part.CanQuery = properties.CanQuery
-            end)
-        end
-    end
+            FlyHumanoid = nil
+            OldAutoRotate = nil
 
-    table.clear(originalPhysics)
-end
-
--- START NOCLIP
-local function StartNoClip(character)
-
-    StopNoClip()
-    ApplyNoClip(character)
-
-    noclipConnection = RunService.Stepped:Connect(function()
-
-        if not character or not character.Parent then
-            StopNoClip()
-            return
+            UpdateFlyButton()
         end
 
-        ApplyNoClip(character)
-    end)
-end
+        local function StartFly()
+            local Character = Player.Character
+            if not Character then
+                return false
+            end
 
--- STOP FLY
-local function StopFly()
+            local Humanoid =
+                Character:FindFirstChildOfClass("Humanoid")
 
-    flyEnabled = false
+            local Root =
+                Character:FindFirstChild("HumanoidRootPart")
 
-    if flyConnection then
-        flyConnection:Disconnect()
-        flyConnection = nil
-    end
+            if not Humanoid or not Root then
+                return false
+            end
 
-    if flyVelocity then
-        flyVelocity:Destroy()
-        flyVelocity = nil
-    end
+            if Humanoid.RigType ~= Enum.HumanoidRigType.R6 then
+                return false
+            end
 
-    if flyGyro then
-        flyGyro:Destroy()
-        flyGyro = nil
-    end
+            local Camera = workspace.CurrentCamera
+            if not Camera then
+                return false
+            end
 
-    StopNoClip()
+            FlyHumanoid = Humanoid
+            OldAutoRotate = Humanoid.AutoRotate
+            Humanoid.AutoRotate = false
 
-    if flyHumanoid and flyHumanoid.Parent then
+            -- ATTACHMENT
+            FlyAttachment = Instance.new("Attachment")
+            FlyAttachment.Name = "MIX0MUSI_FlyAttachment"
+            FlyAttachment.Parent = Root
 
-        flyHumanoid.AutoRotate = oldAutoRotate
+            -- LINEAR VELOCITY
+            FlyVelocity = Instance.new("LinearVelocity")
+            FlyVelocity.Name = "MIX0MUSI_FlyVelocity"
+            FlyVelocity.Attachment0 = FlyAttachment
+            FlyVelocity.RelativeTo = Enum.ActuatorRelativeTo.World
+            FlyVelocity.VelocityConstraintMode =
+                Enum.VelocityConstraintMode.Vector
+            FlyVelocity.VectorVelocity = Vector3.zero
+            FlyVelocity.MaxForce = 100000000
+            FlyVelocity.Parent = Root
 
-        flyHumanoid:ChangeState(
-            Enum.HumanoidStateType.GettingUp
-        )
-    end
+            -- ORIENTATION
+            FlyOrientation = Instance.new("AlignOrientation")
+            FlyOrientation.Name = "MIX0MUSI_FlyOrientation"
+            FlyOrientation.Mode =
+                Enum.OrientationAlignmentMode.OneAttachment
+            FlyOrientation.Attachment0 = FlyAttachment
+            FlyOrientation.MaxTorque = 100000000
+            FlyOrientation.Responsiveness = 25
+            FlyOrientation.CFrame = Camera.CFrame.Rotation
+            FlyOrientation.Parent = Root
 
-    flyHumanoid = nil
-    oldAutoRotate = nil
+            FlyEnabled = true
+            Humanoid:ChangeState(
+                Enum.HumanoidStateType.Physics
+            )
 
-    FlyButton.Text = "FLY: OFF"
-end
+            UpdateFlyButton()
 
--- START FLY
-local function StartFly()
-
-    local character = player.Character
-
-    if not character then
-        return false
-    end
-
-    local humanoid =
-        character:FindFirstChildOfClass("Humanoid")
-
-    local root =
-        character:FindFirstChild("HumanoidRootPart")
-
-    if not humanoid or not root then
-        return false
-    end
-
-    if humanoid.RigType ~= Enum.HumanoidRigType.R6 then
-        return false
-    end
-
-    flyHumanoid = humanoid
-    oldAutoRotate = humanoid.AutoRotate
-
-    humanoid.AutoRotate = false
-
-    StartNoClip(character)
-
-    -- BODY VELOCITY
-    flyVelocity = Instance.new("BodyVelocity")
-    flyVelocity.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-    flyVelocity.Velocity = Vector3.zero
-    flyVelocity.Parent = root
-
-    -- BODY GYRO
-    flyGyro = Instance.new("BodyGyro")
-    flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-    flyGyro.P = 90000
-    flyGyro.D = 1000
-    flyGyro.CFrame = workspace.CurrentCamera.CFrame
-    flyGyro.Parent = root
-
-    flyEnabled = true
-    FlyButton.Text = "FLY: ON"
-
-    -- MOVEMENT LOOP
-    flyConnection = RunService.RenderStepped:Connect(function()
-
-        if not flyEnabled then
-            return
-        end
-
-        if not root.Parent then
-            StopFly()
-            return
-        end
-
-        local camera = workspace.CurrentCamera
-
-        if not camera then
-            return
-        end
-
-        local forward = 0
-        local right = 0
-        local vertical = 0
-
-        if UIS:IsKeyDown(Enum.KeyCode.W) then
-            forward = forward + 1
-        end
-
-        if UIS:IsKeyDown(Enum.KeyCode.S) then
-            forward = forward - 1
-        end
-
-        if UIS:IsKeyDown(Enum.KeyCode.D) then
-            right = right + 1
-        end
-
-        if UIS:IsKeyDown(Enum.KeyCode.A) then
-            right = right - 1
-        end
-
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then
-            vertical = vertical + 1
-        end
-
-        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
-            vertical = vertical - 1
-        end
-
-        local direction =
-            camera.CFrame.LookVector * forward
-            + camera.CFrame.RightVector * right
-            + Vector3.new(0, vertical, 0)
-
-        if direction.Magnitude > 0 then
-            direction = direction.Unit
-        end
-
-        -- LIVE SPEED CONTROL
-        flyVelocity.Velocity = direction * flySpeed
-
-        flyGyro.CFrame = camera.CFrame
-    end)
-
-    return true
-end
-
--- ==================================
--- SPEED BUTTONS
--- ==================================
-
-local function UpdateSpeed()
-
-    SpeedLabel.Text = "SPEED: " .. flySpeed
-
-end
-
-SpeedDown.MouseButton1Click:Connect(function()
-
-    flySpeed = math.max(10, flySpeed - 5)
-
-    UpdateSpeed()
-
-end)
-
-SpeedUp.MouseButton1Click:Connect(function()
-
-    flySpeed = math.min(150, flySpeed + 5)
-
-    UpdateSpeed()
-
-end)
-
--- FLY TOGGLE
-FlyButton.MouseButton1Click:Connect(function()
-
-    if flyEnabled then
-
-        StopFly()
-
-    else
-
-        local success = StartFly()
-
-        if not success then
-
-            FlyButton.Text = "R6 REQUIRED"
-
-            task.delay(1.5, function()
-
-                if FlyButton.Parent and not flyEnabled then
-                    FlyButton.Text = "FLY: OFF"
+            FlyConnection = RunService.RenderStepped:Connect(function()
+                if not FlyEnabled then
+                    return
                 end
 
+                if not Root.Parent or Humanoid.Health <= 0 then
+                    StopFly()
+                    return
+                end
+
+                local CurrentCamera = workspace.CurrentCamera
+                if not CurrentCamera then
+                    return
+                end
+
+                if UIS:GetFocusedTextBox() then
+                    FlyVelocity.VectorVelocity = Vector3.zero
+                    return
+                end
+
+                local Forward = 0
+                local Side = 0
+                local Vertical = 0
+
+                if UIS:IsKeyDown(Enum.KeyCode.W) then
+                    Forward += 1
+                end
+
+                if UIS:IsKeyDown(Enum.KeyCode.S) then
+                    Forward -= 1
+                end
+
+                if UIS:IsKeyDown(Enum.KeyCode.D) then
+                    Side += 1
+                end
+
+                if UIS:IsKeyDown(Enum.KeyCode.A) then
+                    Side -= 1
+                end
+
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then
+                    Vertical += 1
+                end
+
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
+                    Vertical -= 1
+                end
+
+                local Direction =
+                    CurrentCamera.CFrame.LookVector * Forward
+                    + CurrentCamera.CFrame.RightVector * Side
+                    + Vector3.new(0, Vertical, 0)
+
+                if Direction.Magnitude > 1 then
+                    Direction = Direction.Unit
+                end
+
+                -- LIVE SPEED CONTROL
+                FlyVelocity.VectorVelocity =
+                    Direction * FlySpeed
+
+                FlyOrientation.CFrame =
+                    CurrentCamera.CFrame.Rotation
             end)
+
+            return true
         end
-    end
-end)
 
--- ==================================
--- NAVIGATION
--- ==================================
+        FlyButton.MouseButton1Click:Connect(function()
+            if FlyEnabled then
+                StopFly()
+            else
+                if not StartFly() then
+                    FlyButton.Text = "R6 REQUIRED"
+                    task.delay(1.5, function()
+                        if FlyButton.Parent and not FlyEnabled then
+                            FlyButton.Text = "FLY: OFF"
+                        end
+                    end)
+                end
+            end
+        end)
 
-local function OpenSection(name)
+        -- CLEANUP ON RESPAWN
+        Player.CharacterAdded:Connect(function()
+            StopFly()
+        end)
 
-    SectionTitle.Text = name
+        -- CLEANUP WHEN GUI CLOSES
+        Gui.Destroying:Connect(function()
+            StopFly()
+        end)
 
-    Home.Visible = false
-    Section.Visible = true
-
-    local november = (name == "NOVEMBER")
-
-    FlyButton.Visible = november
-    SpeedDown.Visible = november
-    SpeedLabel.Visible = november
-    SpeedUp.Visible = november
-
-    if november then
-        Info.Text = "NOVEMBER FUNCTIONS"
     else
-        Info.Text = "FARM FUNCTIONS"
+        Label(
+            Page,
+            Name,
+            UDim2.fromOffset(5, 8),
+            UDim2.fromOffset(300, 35),
+            22,
+            C.White
+        )
+
+        local Coming = Instance.new("Frame")
+        Coming.Position = UDim2.fromOffset(0, 68)
+        Coming.Size = UDim2.new(1, -5, 0, 130)
+        Coming.BackgroundColor3 = C.Panel
+        Coming.BorderSizePixel = 0
+        Coming.Parent = Page
+
+        Round(Coming, 12)
+        Stroke(Coming, C.RedDark, 1)
+
+        Label(
+            Coming,
+            "COMING SOON",
+            UDim2.fromScale(0, 0.35),
+            UDim2.fromScale(1, 0.25),
+            18,
+            C.Red
+        )
+
+        Label(
+            Coming,
+            "FUNCTIONS WILL BE ADDED",
+            UDim2.fromScale(0, 0.6),
+            UDim2.fromScale(1, 0.2),
+            10,
+            C.Gray
+        )
     end
 end
 
-NovemberButton.MouseButton1Click:Connect(function()
-    OpenSection("NOVEMBER")
+-- NAVIGATION
+local CurrentPage = "NOVEMBER"
+
+local function OpenPage(Name)
+    CurrentPage = Name
+
+    for PageName, Page in pairs(Pages) do
+        Page.Visible = PageName == Name
+    end
+
+    for ButtonName, Nav in pairs(NavButtons) do
+        if ButtonName == Name then
+            Nav.BackgroundColor3 = C.RedDark
+            Nav.TextColor3 = C.White
+        else
+            Nav.BackgroundColor3 = C.Card
+            Nav.TextColor3 = C.Gray
+        end
+    end
+end
+
+for Name, Nav in pairs(NavButtons) do
+    Nav.MouseButton1Click:Connect(function()
+        OpenPage(Name)
+    end)
+end
+
+OpenPage("NOVEMBER")
+
+-- MINIMIZE
+local Minimized = false
+
+Minimize.MouseButton1Click:Connect(function()
+    Minimized = not Minimized
+    Body.Visible = not Minimized
+
+    Main.Size = Minimized
+        and UDim2.fromOffset(650, 68)
+        or UDim2.fromOffset(650, 410)
 end)
-
-FarmButton.MouseButton1Click:Connect(function()
-    OpenSection("FARM")
-end)
-
-Back.MouseButton1Click:Connect(function()
-
-    Section.Visible = false
-    Home.Visible = true
-
-end)
-
--- ==================================
--- WINDOW CONTROLS
--- ==================================
 
 -- CLOSE
 Close.MouseButton1Click:Connect(function()
-
-    StopFly()
-    ScreenGui:Destroy()
-
+    Gui:Destroy()
 end)
 
--- MINIMIZE
-local minimized = false
+-- DRAG
+local Dragging = false
+local DragStart = nil
+local StartPosition = nil
 
-Minimize.MouseButton1Click:Connect(function()
+Header.InputBegan:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.MouseButton1
+        or Input.UserInputType == Enum.UserInputType.Touch then
 
-    minimized = not minimized
+        Dragging = true
+        DragStart = Input.Position
+        StartPosition = Main.Position
 
-    Body.Visible = not minimized
-
-    if minimized then
-
-        Main.Size = UDim2.new(0, 430, 0, 44)
-
-    else
-
-        Main.Size = UDim2.new(0, 430, 0, 300)
-
-    end
-
-end)
-
--- ==================================
--- DRAG WINDOW
--- ==================================
-
-local dragging = false
-local dragStart = nil
-local startPosition = nil
-
-Header.InputBegan:Connect(function(input)
-
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-
-        dragging = true
-        dragStart = input.Position
-        startPosition = Main.Position
-
-        input.Changed:Connect(function()
-
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
+        Input.Changed:Connect(function()
+            if Input.UserInputState == Enum.UserInputState.End then
+                Dragging = false
             end
-
         end)
     end
-
 end)
 
-UIS.InputChanged:Connect(function(input)
-
-    if dragging and (
-        input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch
+UIS.InputChanged:Connect(function(Input)
+    if Dragging and (
+        Input.UserInputType == Enum.UserInputType.MouseMovement
+        or Input.UserInputType == Enum.UserInputType.Touch
     ) then
 
-        local delta = input.Position - dragStart
+        local Delta = Input.Position - DragStart
 
         Main.Position = UDim2.new(
-            startPosition.X.Scale,
-            startPosition.X.Offset + delta.X,
-            startPosition.Y.Scale,
-            startPosition.Y.Offset + delta.Y
+            StartPosition.X.Scale,
+            StartPosition.X.Offset + Delta.X,
+            StartPosition.Y.Scale,
+            StartPosition.Y.Offset + Delta.Y
         )
-
     end
-
 end)
 
--- RESPAWN CLEANUP
-player.CharacterAdded:Connect(function()
-
-    StopFly()
-
-end)
-
--- PARENT GUI
-local parentSuccess = pcall(function()
-
-    ScreenGui.Parent = guiParent
-
-end)
-
-if not parentSuccess then
-
-    ScreenGui.Parent = player:WaitForChild("PlayerGui")
-
-end
-
-print("MIX0MUSI v1.2 LOADED")
+print("MIX0MUSI V2.0 LOADED")
