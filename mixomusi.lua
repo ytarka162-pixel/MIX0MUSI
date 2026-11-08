@@ -1,15 +1,16 @@
 
 --[[
-    MIX0MUSI v2.1
+    MIX0MUSI v2.2
     RED KING EDITION
+    TELEPORT + R6 FLY
     Single LocalScript
 ]]
 
--- SERVICES
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+
 local Player = Players.LocalPlayer
 
 -- SETTINGS
@@ -27,6 +28,52 @@ local FlyHumanoid
 local OldAutoRotate
 local OriginalPhysics = {}
 
+-- TELEPORT LOCATIONS
+local Teleports = {
+    {
+        name = "MAGAZ 1",
+        x = 561.20,
+        y = 29.02,
+        z = -1280.40
+    },
+    {
+        name = "DVOR 1",
+        x = 623.46,
+        y = 28.97,
+        z = -1268.77
+    },
+    {
+        name = "KFC",
+        x = 593.15,
+        y = 33.67,
+        z = -1323.75
+    },
+    {
+        name = "DOSTAVKA",
+        x = 303.24,
+        y = 1.97,
+        z = -244.22
+    },
+    {
+        name = "BILETY",
+        x = 341.02,
+        y = 20.40,
+        z = -1217.81
+    },
+    {
+        name = "ZHENSHINA",
+        x = 212.07,
+        y = 23.89,
+        z = -9441.04
+    },
+    {
+        name = "MUZHIK",
+        x = 135.19,
+        y = 25.03,
+        z = 9943.62
+    }
+}
+
 -- COLORS
 local C = {
     Black = Color3.fromRGB(12, 9, 13),
@@ -36,7 +83,7 @@ local C = {
     DarkRed = Color3.fromRGB(105, 25, 37),
     White = Color3.fromRGB(245, 237, 239),
     Gray = Color3.fromRGB(165, 145, 152),
-    Gold = Color3.fromRGB(235, 184, 72),
+    Gold = Color3.fromRGB(235, 184, 72)
 }
 
 -- GUI PARENT
@@ -57,9 +104,7 @@ local GuiParent = GetParent()
 -- REMOVE OLD GUI
 pcall(function()
     local old = GuiParent:FindFirstChild("MIX0MUSI_V2")
-    if old then
-        old:Destroy()
-    end
+    if old then old:Destroy() end
 end)
 
 -- GUI
@@ -67,14 +112,7 @@ local Gui = Instance.new("ScreenGui")
 Gui.Name = "MIX0MUSI_V2"
 Gui.ResetOnSpawn = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-local parentOK = pcall(function()
-    Gui.Parent = GuiParent
-end)
-
-if not parentOK then
-    Gui.Parent = Player:WaitForChild("PlayerGui")
-end
+Gui.Parent = GuiParent
 
 -- UI HELPERS
 local function Round(obj, radius)
@@ -141,8 +179,8 @@ end
 -- MAIN WINDOW
 local Main = Instance.new("Frame")
 Main.Name = "Main"
-Main.Size = UDim2.fromOffset(650, 410)
-Main.Position = UDim2.new(0.5, -325, 0.5, -205)
+Main.Size = UDim2.fromOffset(650, 450)
+Main.Position = UDim2.new(0.5, -325, 0.5, -225)
 Main.BackgroundColor3 = C.Black
 Main.BorderSizePixel = 0
 Main.ClipsDescendants = true
@@ -159,7 +197,7 @@ Header.BorderSizePixel = 0
 Header.Active = true
 Header.Parent = Main
 
--- ORIGINAL BIRD MASCOT
+-- BIRD MASCOT
 local Bird = Instance.new("Frame")
 Bird.Size = UDim2.fromOffset(45, 45)
 Bird.Position = UDim2.fromOffset(16, 11)
@@ -189,7 +227,6 @@ MakeLabel(
     C.Gold
 )
 
--- TITLE
 MakeLabel(
     Header,
     "MIX0MUSI",
@@ -217,7 +254,7 @@ MakeLabel(
     C.Gold
 )
 
--- DECORATIVE DROPS
+-- RED DROPS
 for i = 1, 5 do
     local drop = Instance.new("Frame")
     drop.Size = UDim2.fromOffset(6, 15 + (i % 3) * 3)
@@ -228,7 +265,7 @@ for i = 1, 5 do
     Round(drop, 6)
 end
 
--- CLOSE / MINIMIZE
+-- WINDOW BUTTONS
 local Close = MakeButton(
     Header,
     "X",
@@ -300,10 +337,12 @@ for i, name in ipairs(Names) do
     page.Parent = Content
 
     Pages[name] = page
-
 end
 
+-- ==================================
 -- NOVEMBER PAGE
+-- ==================================
+
 local November = Pages.NOVEMBER
 
 MakeLabel(
@@ -368,7 +407,7 @@ MakeLabel(
 
 local Minus = MakeButton(
     FlyCard,
-    "−",
+    "-",
     UDim2.fromOffset(18, 155),
     UDim2.fromOffset(43, 34)
 )
@@ -391,15 +430,129 @@ local Plus = MakeButton(
 
 MakeLabel(
     November,
-    "WASD - MOVE     SPACE - UP     CTRL - DOWN",
+    "WASD - MOVE   SPACE - UP   CTRL - DOWN",
     UDim2.fromOffset(4, 284),
     UDim2.new(1, -10, 0, 20),
     10,
     C.Gray
 )
 
+-- ==================================
+-- TELEPORT PAGE
+-- ==================================
+
+local TeleportPage = Pages.TELEPORT
+
+MakeLabel(
+    TeleportPage,
+    "TELEPORT",
+    UDim2.fromOffset(5, 3),
+    UDim2.fromOffset(300, 35),
+    22
+)
+
+MakeLabel(
+    TeleportPage,
+    "SELECT DESTINATION",
+    UDim2.fromOffset(7, 36),
+    UDim2.fromOffset(250, 18),
+    10,
+    C.Gray
+)
+
+local TeleportList = Instance.new("ScrollingFrame")
+TeleportList.Position = UDim2.fromOffset(0, 60)
+TeleportList.Size = UDim2.new(1, -5, 0, 275)
+TeleportList.BackgroundColor3 = C.Panel
+TeleportList.BorderSizePixel = 0
+TeleportList.ScrollBarThickness = 5
+TeleportList.ScrollBarImageColor3 = C.Red
+TeleportList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+TeleportList.CanvasSize = UDim2.new(0, 0, 0, 0)
+TeleportList.Parent = TeleportPage
+
+Round(TeleportList, 10)
+AddStroke(TeleportList, C.DarkRed)
+
+local ListPadding = Instance.new("UIPadding")
+ListPadding.PaddingTop = UDim.new(0, 8)
+ListPadding.PaddingBottom = UDim.new(0, 8)
+ListPadding.PaddingLeft = UDim.new(0, 8)
+ListPadding.PaddingRight = UDim.new(0, 8)
+ListPadding.Parent = TeleportList
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0, 7)
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ListLayout.Parent = TeleportList
+
+local TeleportStatus = MakeLabel(
+    TeleportPage,
+    "Choose a destination",
+    UDim2.fromOffset(5, 342),
+    UDim2.new(1, -10, 0, 20),
+    11,
+    C.Gray
+)
+
+local function TeleportTo(point)
+    local character = Player.Character
+    if not character then
+        TeleportStatus.Text = "Character not found"
+        return
+    end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+
+    if not humanoid or not root or humanoid.Health <= 0 then
+        TeleportStatus.Text = "Character unavailable"
+        return
+    end
+
+    local destination = Vector3.new(
+        point.x,
+        point.y,
+        point.z
+    )
+
+    local success, err = pcall(function()
+        character:PivotTo(CFrame.new(destination))
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+
+    if success then
+        TeleportStatus.Text = "Requested: " .. point.name
+    else
+        TeleportStatus.Text = "Teleport error"
+        warn("[MIX0MUSI] Teleport error:", err)
+    end
+end
+
+for i, destination in ipairs(Teleports) do
+
+    local point = destination
+
+    local TeleportButton = MakeButton(
+        TeleportList,
+        point.name .. "     [ TELEPORT ]",
+        UDim2.new(0, 0, 0, 0),
+        UDim2.new(1, -6, 0, 43)
+    )
+
+    TeleportButton.LayoutOrder = i
+
+    TeleportButton.MouseButton1Click:Connect(function()
+        TeleportTo(point)
+    end)
+end
+
+-- ==================================
 -- OTHER PAGES
-for _, name in ipairs({"FARM", "TROLL", "TELEPORT"}) do
+-- ==================================
+
+for _, name in ipairs({"FARM", "TROLL"}) do
 
     local page = Pages[name]
 
@@ -440,11 +593,14 @@ for _, name in ipairs({"FARM", "TROLL", "TELEPORT"}) do
     )
 end
 
+-- ==================================
 -- NAVIGATION
+-- ==================================
+
 local function OpenPage(name)
 
     for pageName, page in pairs(Pages) do
-        page.Visible = (pageName == name)
+        page.Visible = pageName == name
     end
 
     for buttonName, nav in pairs(NavButtons) do
@@ -480,16 +636,12 @@ local function ApplyNoClip(character)
             if not OriginalPhysics[part] then
                 OriginalPhysics[part] = {
                     CanCollide = part.CanCollide,
-                    CanTouch = part.CanTouch,
-                    CanQuery = part.CanQuery
+                    CanTouch = part.CanTouch
                 }
             end
 
-            pcall(function()
-                part.CanCollide = false
-                part.CanTouch = false
-                part.CanQuery = false
-            end)
+            part.CanCollide = false
+            part.CanTouch = false
         end
     end
 end
@@ -504,11 +656,9 @@ local function StopNoClip()
     for part, properties in pairs(OriginalPhysics) do
 
         if part and part.Parent then
-
             pcall(function()
                 part.CanCollide = properties.CanCollide
                 part.CanTouch = properties.CanTouch
-                part.CanQuery = properties.CanQuery
             end)
         end
     end
@@ -558,9 +708,7 @@ local function StopFly()
     StopNoClip()
 
     if FlyHumanoid and FlyHumanoid.Parent then
-
         FlyHumanoid.AutoRotate = OldAutoRotate
-
         FlyHumanoid:ChangeState(
             Enum.HumanoidStateType.GettingUp
         )
@@ -576,9 +724,7 @@ end
 local function StartFly()
 
     local character = Player.Character
-    if not character then
-        return false
-    end
+    if not character then return false end
 
     local humanoid =
         character:FindFirstChildOfClass("Humanoid")
@@ -586,28 +732,21 @@ local function StartFly()
     local root =
         character:FindFirstChild("HumanoidRootPart")
 
-    if not humanoid or not root then
-        return false
-    end
+    if not humanoid or not root then return false end
 
     if humanoid.RigType ~= Enum.HumanoidRigType.R6 then
         return false
     end
 
-    if humanoid.Health <= 0 then
-        return false
-    end
+    if humanoid.Health <= 0 then return false end
 
     FlyHumanoid = humanoid
     OldAutoRotate = humanoid.AutoRotate
 
     humanoid.AutoRotate = false
-    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 
-    -- LOCAL NOCLIP
     StartNoClip(character)
 
-    -- BODY VELOCITY
     BodyVelocity = Instance.new("BodyVelocity")
     BodyVelocity.MaxForce = Vector3.new(
         1000000000,
@@ -617,7 +756,6 @@ local function StartFly()
     BodyVelocity.Velocity = Vector3.zero
     BodyVelocity.Parent = root
 
-    -- BODY GYRO
     BodyGyro = Instance.new("BodyGyro")
     BodyGyro.MaxTorque = Vector3.new(
         1000000000,
@@ -636,9 +774,7 @@ local function StartFly()
 
     FlyConnection = RunService.RenderStepped:Connect(function()
 
-        if not Flying then
-            return
-        end
+        if not Flying then return end
 
         if not root.Parent or humanoid.Health <= 0 then
             StopFly()
@@ -646,7 +782,10 @@ local function StartFly()
         end
 
         local camera = workspace.CurrentCamera
-        if not camera then
+        if not camera then return end
+
+        if UIS:GetFocusedTextBox() then
+            BodyVelocity.Velocity = Vector3.zero
             return
         end
 
@@ -654,33 +793,28 @@ local function StartFly()
         local side = 0
         local vertical = 0
 
-        if UIS:GetFocusedTextBox() then
-            BodyVelocity.Velocity = Vector3.zero
-            return
-        end
-
         if UIS:IsKeyDown(Enum.KeyCode.W) then
-            forward = forward + 1
+            forward += 1
         end
 
         if UIS:IsKeyDown(Enum.KeyCode.S) then
-            forward = forward - 1
+            forward -= 1
         end
 
         if UIS:IsKeyDown(Enum.KeyCode.D) then
-            side = side + 1
+            side += 1
         end
 
         if UIS:IsKeyDown(Enum.KeyCode.A) then
-            side = side - 1
+            side -= 1
         end
 
         if UIS:IsKeyDown(Enum.KeyCode.Space) then
-            vertical = vertical + 1
+            vertical += 1
         end
 
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
-            vertical = vertical - 1
+            vertical -= 1
         end
 
         local direction =
@@ -692,7 +826,6 @@ local function StartFly()
             direction = direction.Unit
         end
 
-        -- LIVE SPEED
         BodyVelocity.Velocity = direction * FlySpeed
         BodyGyro.CFrame = camera.CFrame
     end)
@@ -700,13 +833,11 @@ local function StartFly()
     return true
 end
 
--- FLY TOGGLE
 FlyButton.MouseButton1Click:Connect(function()
 
     if Flying then
         StopFly()
     else
-
         local success = StartFly()
 
         if not success then
@@ -722,7 +853,7 @@ FlyButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==================================
--- SPEED CONTROL
+-- SPEED
 -- ==================================
 
 local function UpdateSpeed()
@@ -730,27 +861,17 @@ local function UpdateSpeed()
 end
 
 Minus.MouseButton1Click:Connect(function()
-
-    FlySpeed = math.max(
-        MinSpeed,
-        FlySpeed - SpeedStep
-    )
-
+    FlySpeed = math.max(MinSpeed, FlySpeed - SpeedStep)
     UpdateSpeed()
 end)
 
 Plus.MouseButton1Click:Connect(function()
-
-    FlySpeed = math.min(
-        MaxSpeed,
-        FlySpeed + SpeedStep
-    )
-
+    FlySpeed = math.min(MaxSpeed, FlySpeed + SpeedStep)
     UpdateSpeed()
 end)
 
 -- ==================================
--- WINDOW CONTROLS
+-- MINIMIZE / CLOSE
 -- ==================================
 
 local Minimized = false
@@ -760,11 +881,9 @@ Minimize.MouseButton1Click:Connect(function()
     Minimized = not Minimized
     Body.Visible = not Minimized
 
-    if Minimized then
-        Main.Size = UDim2.fromOffset(650, 68)
-    else
-        Main.Size = UDim2.fromOffset(650, 410)
-    end
+    Main.Size = Minimized
+        and UDim2.fromOffset(650, 68)
+        or UDim2.fromOffset(650, 450)
 end)
 
 Close.MouseButton1Click:Connect(function()
@@ -777,7 +896,6 @@ Player.CharacterAdded:Connect(function()
     StopFly()
 end)
 
--- CLEANUP
 Gui.Destroying:Connect(function()
     StopFly()
 end)
@@ -800,7 +918,6 @@ Header.InputBegan:Connect(function(input)
         StartPosition = Main.Position
 
         input.Changed:Connect(function()
-
             if input.UserInputState == Enum.UserInputState.End then
                 Dragging = false
             end
@@ -826,4 +943,4 @@ UIS.InputChanged:Connect(function(input)
     end
 end)
 
-print("MIX0MUSI v2.1 LOADED")
+print("MIX0MUSI v2.2 LOADED")
