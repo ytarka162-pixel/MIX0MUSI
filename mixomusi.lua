@@ -174,7 +174,7 @@ local function MakeButton(parent, text, pos, size)
 end
 
 -- ==================================
--- LOCAL NOCLIP (перенесено выше, чтобы телепорт мог использовать)
+-- LOCAL NOCLIP
 -- ==================================
 local function ApplyNoClip(character)
     for _, part in ipairs(character:GetDescendants()) do
@@ -546,7 +546,7 @@ local function TeleportTo(point)
         return
     end
 
-    -- Если уже идёт телепорт — отменяем предыдущий
+    -- Отменяем предыдущий телепорт
     if CurrentTeleportTween then
         CurrentTeleportTween:Cancel()
         CurrentTeleportTween = nil
@@ -556,15 +556,22 @@ local function TeleportTo(point)
         CurrentTeleportConnection = nil
     end
 
+    -- Обязательно выключаем флай, иначе он разгоняет и убивает
+    if Flying then
+        StopFly()
+    end
+
     local destination = Vector3.new(point.x, point.y, point.z)
     local targetCFrame = CFrame.new(destination)
 
-    -- Включаем noclip на всё время полёта
+    -- Полный noclip + отключаем физику
     StartNoClip(character)
 
-    -- Чтобы физика и падение не мешали
     local wasPlatformStand = humanoid.PlatformStand
     humanoid.PlatformStand = true
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    humanoid.JumpHeight = 0
 
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
@@ -572,7 +579,7 @@ local function TeleportTo(point)
     TeleportStatus.Text = "Teleporting to " .. point.name .. " (5s)..."
 
     local tweenInfo = TweenInfo.new(
-        5, -- ровно 5 секунд
+        5,
         Enum.EasingStyle.Linear,
         Enum.EasingDirection.Out
     )
@@ -584,7 +591,7 @@ local function TeleportTo(point)
     CurrentTeleportTween = tween
     tween:Play()
 
-    -- Каждые кадры держим скорость в нуле (чтобы не убило)
+    -- Жёстко держим скорость в нуле всё время полёта
     CurrentTeleportConnection = RunService.Heartbeat:Connect(function()
         if root and root.Parent then
             root.AssemblyLinearVelocity = Vector3.zero
@@ -599,19 +606,35 @@ local function TeleportTo(point)
         end
         CurrentTeleportTween = nil
 
-        if playbackState == Enum.PlaybackState.Completed and root and root.Parent and humanoid.Health > 0 then
+        if not (root and root.Parent and humanoid and humanoid.Health > 0) then
+            StopNoClip()
+            return
+        end
+
+        -- Финальная фиксация позиции
+        root.CFrame = targetCFrame
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+
+        -- Держим ещё 0.25 секунды "замороженным"
+        task.delay(0.25, function()
+            if not (root and root.Parent and humanoid and humanoid.Health > 0) then
+                StopNoClip()
+                return
+            end
+
             root.CFrame = targetCFrame
             root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
+
             humanoid.PlatformStand = wasPlatformStand
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+            humanoid.JumpHeight = 7.2
+
             StopNoClip()
             TeleportStatus.Text = "Arrived: " .. point.name
-        else
-            StopNoClip()
-            if humanoid and humanoid.Parent then
-                humanoid.PlatformStand = wasPlatformStand
-            end
-        end
+        end)
     end)
 end
 
